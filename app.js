@@ -1,5 +1,5 @@
 // change this to reference the dataset you chose to work with.
-import { bikeShare as chartData } from "./data/bikeShare.js";
+import { climateData as chartData } from "./data/climateData.js";
 
 // --- DOM helpers ---
 const monthSelect = document.getElementById("monthSelect");
@@ -14,7 +14,7 @@ let currentChart = null;
 
 // --- Populate dropdowns from data ---
 const months = [...new Set(chartData.map(r => r.month))];
-const hoods = [...new Set(chartData.map(r => r.hood))];
+const hoods = [...new Set(chartData.map(r => r.city))];
 
 months.forEach(m => monthSelect.add(new Option(m, m)));
 hoods.forEach(h => hoodSelect.add(new Option(h, h)));
@@ -29,24 +29,24 @@ dataPreview.textContent = JSON.stringify(chartData.slice(0, 6), null, 2);
 renderBtn.addEventListener("click", () => {
   const chartType = chartTypeSelect.value;
   const month = monthSelect.value;
-  const hood = hoodSelect.value;
+  const city = hoodSelect.value;
   const metric = metricSelect.value;
 
   // Destroy old chart if it exists (common Chart.js gotcha)
   if (currentChart) currentChart.destroy();
 
   // Build chart config based on type
-  const config = buildConfig(chartType, { month, hood, metric });
+  const config = buildConfig(chartType, { month, city, metric });
 
   currentChart = new Chart(canvas, config);
 });
 
 // --- Students: you’ll edit / extend these functions ---
-function buildConfig(type, { month, hood, metric }) {
+function buildConfig(type, { month, city, metric }) {
   if (type === "bar") return barByNeighborhood(month, metric);
-  if (type === "line") return lineOverTime(hood, ["trips", "revenueUSD"]);
-  if (type === "scatter") return scatterTripsVsTemp(hood);
-  if (type === "doughnut") return doughnutMemberVsCasual(month, hood);
+  if (type === "line") return lineOverTime(city, ["avgTempC", "sunshineHours"]);
+  if (type === "scatter") return scatterTripsVsTemp(city);
+  if (type === "doughnut") return doughnutMemberVsCasual(month, city);
   if (type === "radar") return radarCompareNeighborhoods(month);
   return barByNeighborhood(month, metric);
 }
@@ -55,8 +55,10 @@ function buildConfig(type, { month, hood, metric }) {
 function barByNeighborhood(month, metric) {
   const rows = chartData.filter(r => r.month === month);
 
-  const labels = rows.map(r => r.hood);
+  const labels = rows.map(r => r.city);
   const values = rows.map(r => r[metric]);
+
+  console.log(month, metric);
 
   return {
     type: "bar",
@@ -70,22 +72,22 @@ function barByNeighborhood(month, metric) {
     options: {
       responsive: true,
       plugins: {
-        title: { display: true, text: `Neighborhood comparison (${month})` }
+        title: { display: true, text: `Temperature comparison (${month})` }
       },
       scales: {
         y: { title: { display: true, text: metric } },
-        x: { title: { display: true, text: "Neighborhood" } }
+        x: { title: { display: true, text: "Temperature" } }
       }
     }
   };
 }
 
 // Task B: LINE — trend over time for one neighborhood (2 datasets)
-function lineOverTime(hood, metrics) {
-  const rows = chartData.filter(r => r.hood === hood);
+function lineOverTime(city, metrics) {
+  const rows = chartData.filter(r => r.city === city);
 
   const labels = rows.map(r => r.month);
-
+ console.log(city, metrics)
   const datasets = metrics.map(m => ({
     label: m,
     data: rows.map(r => r[m])
@@ -97,7 +99,7 @@ function lineOverTime(hood, metrics) {
     options: {
       responsive: true,
       plugins: {
-        title: { display: true, text: `Trends over time: ${hood}` }
+        title: { display: true, text: `Trends over time: ${city}` }
       },
       scales: {
         y: { title: { display: true, text: "Value" } },
@@ -107,48 +109,48 @@ function lineOverTime(hood, metrics) {
   };
 }
 
-// SCATTER — relationship between temperature and trips
-function scatterTripsVsTemp(hood) {
-  const rows = chartData.filter(r => r.hood === hood);
+// SCATTER — relationship between temperature and Air Quality
+function scatterTripsVsTemp(city) {
+  const rows = chartData.filter(r => r.city === city);
 
-  const points = rows.map(r => ({ x: r.tempC, y: r.trips }));
-
+  const points = rows.map(r => ({ x: r.minTempC, y: r.airQualityIndex }));
+console.log(city);
   return {
     type: "scatter",
     data: {
       datasets: [{
-        label: `Trips vs Temp (${hood})`,
+        label: `Trips vs Temp (${city})`,
         data: points
       }]
     },
     options: {
       plugins: {
-        title: { display: true, text: `Does temperature affect trips? (${hood})` }
+        title: { display: true, text: `Does temperature affect Air Quality? (${city})` }
       },
       scales: {
         x: { title: { display: true, text: "Temperature (C)" } },
-        y: { title: { display: true, text: "Trips" } }
+        y: { title: { display: true, text: "Air Quality" } }
       }
     }
   };
 }
 
-// DOUGHNUT — member vs casual share for one hood + month
-function doughnutMemberVsCasual(month, hood) {
-  const row = chartData.find(r => r.month === month && r.hood === hood);
+// DOUGHNUT — Teampture vs casual share for one city + month
+function doughnutMemberVsCasual(month, city) {
+  const row = chartData.find(r => r.month === month && r.city === city);
 
-  const member = Math.round(row.memberShare * 100);
+  const member = Math.round(row.avgTempC * 100);
   const casual = 100 - member;
-
+console.log(member);
   return {
     type: "doughnut",
     data: {
-      labels: ["Members (%)", "Casual (%)"],
+      labels: ["Tempature (%)", "Air Quality (%)"],
       datasets: [{ label: "Rider mix", data: [member, casual] }]
     },
     options: {
       plugins: {
-        title: { display: true, text: `Rider mix: ${hood} (${month})` }
+        title: { display: true, text: `Rider mix: ${city} (${month})` }
       }
     }
   };
@@ -158,11 +160,11 @@ function doughnutMemberVsCasual(month, hood) {
 function radarCompareNeighborhoods(month) {
   const rows = chartData.filter(r => r.month === month);
 
-  const metrics = ["trips", "revenueUSD", "avgDurationMin", "incidents"];
+  const metrics = ["avgTempC", "sunshineHours", "windKph", "airQualityIndex", "humidityPct", "precipMM"];
   const labels = metrics;
 
   const datasets = rows.map(r => ({
-    label: r.hood,
+    label: r.city,
     data: metrics.map(m => r[m])
   }));
 
